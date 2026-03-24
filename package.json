@@ -4,6 +4,6 @@
   "description": "VIONYX X posting proxy",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
