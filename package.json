@@ -1,9 +1,5 @@
 {
-  "name": "vionyx-x-backend",
+  "name": "vionyx-backend",
   "version": "1.0.0",
-  "description": "VIONYX X posting proxy",
-  "type": "module",
-  "engines": {
-    "node": "24.x"
-  }
+  "type": "module"
 }
