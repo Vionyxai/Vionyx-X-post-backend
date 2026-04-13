@@ -1,3 +1,5 @@
+import { db } from '../../lib/db.js';
+
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost:3000';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_VERSION = process.env.ANTHROPIC_VERSION || '2023-06-01';
@@ -30,7 +32,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   if (!ANTHROPIC_API_KEY) {
-    console.error('[generate-draft] ANTHROPIC_API_KEY not configured');
+    console.error('[drafts/generate] ANTHROPIC_API_KEY not configured');
     return res.status(500).json({ error: 'Server misconfiguration' });
   }
 
@@ -48,8 +50,9 @@ export default async function handler(req, res) {
 
   const userPrompt = `Mirror this into a VIONYX post for X:\n\n"${input.trim()}"\n\nAudience emphasis: ${(audience || 'general').trim()}\n\nDraft the post now.`;
 
-  console.log(`[generate-draft] Generating draft | input_length=${input.length}`);
+  console.log(`[drafts/generate] Generating draft | input_length=${input.length}`);
 
+  let draft;
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -70,26 +73,40 @@ export default async function handler(req, res) {
     try {
       data = await response.json();
     } catch {
-      console.error('[generate-draft] Failed to parse Anthropic response');
+      console.error('[drafts/generate] Failed to parse Anthropic response');
       return res.status(502).json({ error: 'Upstream response parse failed' });
     }
 
     if (!response.ok) {
-      console.error(`[generate-draft] Anthropic error | status=${response.status}`);
+      console.error(`[drafts/generate] Anthropic error | status=${response.status}`);
       return res.status(502).json({ error: 'Draft generation failed' });
     }
 
-    const draft = data?.content?.[0]?.text?.trim();
+    draft = data?.content?.[0]?.text?.trim();
     if (!draft) {
-      console.error('[generate-draft] Empty draft returned from Anthropic');
+      console.error('[drafts/generate] Empty draft from Anthropic');
       return res.status(502).json({ error: 'Empty response from model' });
     }
+  } catch (err) {
+    console.error(`[drafts/generate] Fetch error | ${err.message}`);
+    return res.status(500).json({ error: 'Draft generation failed' });
+  }
 
-    console.log(`[generate-draft] Draft generated | length=${draft.length}`);
-    return res.status(200).json({ draft });
+  // Persist to database
+  try {
+    const result = await db.query(
+      `INSERT INTO drafts (content, input, audience, status)
+       VALUES ($1, $2, $3, 'draft')
+       RETURNING id, content, status, created_at`,
+      [draft, input.trim(), audience?.trim() || null]
+    );
+
+    const row = result.rows[0];
+    console.log(`[drafts/generate] Saved draft | id=${row.id} length=${draft.length}`);
+    return res.status(201).json({ id: row.id, draft: row.content, status: row.status, created_at: row.created_at });
 
   } catch (err) {
-    console.error(`[generate-draft] Unexpected error | ${err.message}`);
-    return res.status(500).json({ error: 'Draft generation failed' });
+    console.error(`[drafts/generate] DB error | ${err.message}`);
+    return res.status(500).json({ error: 'Failed to save draft' });
   }
 }
