@@ -5,10 +5,5 @@
       "path": "/api/cron/process-queue",
       "schedule": "* * * * *"
     }
-  ],
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  ]
 }
