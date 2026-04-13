@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIONYX — Post Control</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 13px;
+      letter-spacing: 6px;
+      color: #555;
+      text-transform: uppercase;
+      margin-bottom: 48px;
+    }
+
+    .step {
+      border: 1px solid #1e1e1e;
+      border-radius: 4px;
+      padding: 24px;
+      margin-bottom: 20px;
+      background: #111;
+    }
+
+    .step-label {
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .step-title {
+      font-size: 15px;
+      color: #ccc;
+      margin-bottom: 20px;
+    }
+
+    textarea, input[type="text"], input[type="datetime-local"] {
+      width: 100%;
+      background: #0a0a0a;
+      border: 1px solid #222;
+      color: #e0e0e0;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      padding: 12px;
+      border-radius: 3px;
+      resize: vertical;
+      outline: none;
+      margin-bottom: 12px;
+    }
+
+    textarea:focus, input:focus {
+      border-color: #444;
+    }
+
+    button {
+      background: #e0e0e0;
+      color: #0a0a0a;
+      border: none;
+      padding: 10px 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #fff; }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+    .output {
+      margin-top: 16px;
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 3px;
+      padding: 14px;
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+    }
+
+    .output.visible { display: block; }
+    .output.ok { border-color: #1a3a1a; color: #6fcf6f; }
+    .output.err { border-color: #3a1a1a; color: #cf6f6f; }
+
+    .draft-box {
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #e0e0e0;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .draft-box.visible { display: block; }
+
+    .char-count {
+      font-size: 11px;
+      color: #444;
+      margin-bottom: 12px;
+    }
+
+    .char-count.warn { color: #cf6f6f; }
+
+    .row { display: flex; gap: 10px; align-items: flex-start; }
+    .row button { flex-shrink: 0; }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #555;
+      margin-bottom: 32px;
+      letter-spacing: 1px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #333;
+    }
+
+    .dot.green { background: #4caf50; }
+
+    .results-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .result-card {
+      background: #0a0a0a;
+      border: 1px solid #1e1e1e;
+      border-radius: 3px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .result-card .tag {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 2px;
+      padding: 2px 8px;
+      border-radius: 2px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .tag.success { background: #1a3a1a; color: #6fcf6f; }
+    .tag.failed { background: #3a1a1a; color: #cf6f6f; }
+
+    .result-card .content { color: #aaa; margin-bottom: 4px; }
+    .result-card .meta { color: #555; font-size: 11px; }
+
+    label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>VIONYX — Post Control</h1>
+
+  <div class="status-bar">
+    <div class="dot" id="health-dot"></div>
+    <span id="health-label">Checking system...</span>
+  </div>
+
+  <!-- STEP 1: GENERATE -->
+  <div class="step">
+    <div class="step-label">Step 01</div>
+    <div class="step-title">Generate Draft</div>
+
+    <label>Your idea</label>
+    <textarea id="input" rows="3" placeholder="What's the thought? Write it raw."></textarea>
+
+    <label>Audience</label>
+    <input type="text" id="audience" placeholder="e.g. high performer, founder, athlete" />
+
+    <button id="gen-btn" onclick="generateDraft()">Generate</button>
+
+    <div class="draft-box" id="draft-box"></div>
+    <div class="char-count" id="char-count"></div>
+    <div class="output" id="gen-output"></div>
+  </div>
+
+  <!-- STEP 2: APPROVE -->
+  <div class="step">
+    <div class="step-label">Step 02</div>
+    <div class="step-title">Approve Draft</div>
+    <p style="font-size:12px;color:#555;margin-bottom:16px;">Review the draft above. If it's right, approve it for scheduling.</p>
+    <button id="approve-btn" disabled onclick="approveDraft()">Approve</button>
+    <div class="output" id="approve-output"></div>
+  </div>
+
+  <!-- STEP 3: SCHEDULE -->
+  <div class="step">
+    <div class="step-label">Step 03</div>
+    <div class="step-title">Schedule Post</div>
+
+    <label>Post time</label>
+    <input type="datetime-local" id="schedule-time" />
+
+    <div class="row">
+      <button id="now-btn" disabled onclick="scheduleNow()">Post in 2 min</button>
+      <button id="schedule-btn" disabled onclick="scheduleAt()">Schedule at time above</button>
+    </div>
+    <div class="output" id="schedule-output"></div>
+  </div>
+
+  <!-- STEP 4: RESULTS -->
+  <div class="step">
+    <div class="step-label">Step 04</div>
+    <div class="step-title">Results</div>
+    <button onclick="loadResults()">Refresh</button>
+    <div id="results-list" class="results-list" style="margin-top:16px;"></div>
+  </div>
+
+  <script>
+    const BASE = '';
+    let currentDraftId = null;
+    let currentDraftApproved = false;
+
+    // Health check on load
+    async function checkHealth() {
+      const dot = document.getElementById('health-dot');
+      const label = document.getElementById('health-label');
+      try {
+        const r = await fetch(`${BASE}/api/health`);
+        const d = await r.json();
+        if (d.status === 'ok') {
+          dot.classList.add('green');
+          label.textContent = 'System online — db connected';
+        } else {
+          label.textContent = `Degraded — db:${d.db} config:${d.config}`;
+        }
+      } catch {
+        label.textContent = 'Cannot reach API';
+      }
+    }
+
+    function showOutput(id, text, isError) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'output visible ' + (isError ? 'err' : 'ok');
+    }
+
+    async function generateDraft() {
+      const input = document.getElementById('input').value.trim();
+      const audience = document.getElementById('audience').value.trim();
+      if (!input) return alert('Enter your idea first.');
+
+      const btn = document.getElementById('gen-btn');
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      document.getElementById('draft-box').classList.remove('visible');
+      document.getElementById('approve-btn').disabled = true;
+      document.getElementById('now-btn').disabled = true;
+      document.getElementById('schedule-btn').disabled = true;
+      currentDraftId = null;
+      currentDraftApproved = false;
+
+      try {
+        const r = await fetch(`${BASE}/api/drafts/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ input, audience: audience || 'general' })
+        });
+        const d = await r.json();
+
+        if (!r.ok) {
+          showOutput('gen-output', JSON.stringify(d, null, 2), true);
+        } else {
+          currentDraftId = d.id;
+          const box = document.getElementById('draft-box');
+          box.textContent = d.draft;
+          box.classList.add('visible');
+
+          const len = d.draft.length;
+          const cc = document.getElementById('char-count');
+          cc.textContent = `${len} / 280 characters`;
+          cc.className = 'char-count' + (len > 260 ? ' warn' : '');
+
+          showOutput('gen-output', `Draft saved — ID: ${d.id}`, false);
+          document.getElementById('approve-btn').disabled = false;
+        }
+      } catch (e) {
+        showOutput('gen-output', `Error: ${e.message}`, true);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+    }
+
+    async function approveDraft() {
+      if (!currentDraftId) return;
+
+      const btn = document.getElementById('approve-btn');
+      btn.disabled = true;
+      btn.textContent = 'Approving...';
+
+      try {
+        const r = await fetch(`${BASE}/api/drafts/${currentDraftId}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const d = await r.json();
+
+        if (!r.ok) {
+          showOutput('approve-output', JSON.stringify(d, null, 2), true);
+          btn.disabled = false;
+        } else {
+          currentDraftApproved = true;
+          showOutput('approve-output', `Approved — ready to schedule`, false);
+          document.getElementById('now-btn').disabled = false;
+          document.getElementById('schedule-btn').disabled = false;
+
+          // Default schedule time to 2 min from now
+          const t = new Date(Date.now() + 2 * 60000);
+          document.getElementById('schedule-time').value = t.toISOString().slice(0, 16);
+        }
+      } catch (e) {
+        showOutput('approve-output', `Error: ${e.message}`, true);
+        btn.disabled = false;
+        btn.textContent = 'Approve';
+      }
+    }
+
+    async function schedulePost(time) {
+      if (!currentDraftId) return;
+
+      try {
+        const r = await fetch(`${BASE}/api/scheduled-posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ draft_id: currentDraftId, scheduled_time: time })
+        });
+        const d = await r.json();
+
+        if (!r.ok) {
+          showOutput('schedule-output', JSON.stringify(d, null, 2), true);
+        } else {
+          const t = new Date(time).toLocaleString();
+          showOutput('schedule-output', `Scheduled for ${t}\nID: ${d.id}\n\nThe cron will fire it automatically.`, false);
+          document.getElementById('now-btn').disabled = true;
+          document.getElementById('schedule-btn').disabled = true;
+        }
+      } catch (e) {
+        showOutput('schedule-output', `Error: ${e.message}`, true);
+      }
+    }
+
+    function scheduleNow() {
+      const t = new Date(Date.now() + 2 * 60000).toISOString();
+      schedulePost(t);
+    }
+
+    function scheduleAt() {
+      const val = document.getElementById('schedule-time').value;
+      if (!val) return alert('Pick a date and time first.');
+      schedulePost(new Date(val).toISOString());
+    }
+
+    async function loadResults() {
+      const list = document.getElementById('results-list');
+      list.innerHTML = '<div style="color:#555;font-size:12px;">Loading...</div>';
+
+      try {
+        const r = await fetch(`${BASE}/api/results`);
+        const d = await r.json();
+        const results = d.results || [];
+
+        if (results.length === 0) {
+          list.innerHTML = '<div style="color:#444;font-size:12px;">No posts yet.</div>';
+          return;
+        }
+
+        list.innerHTML = results.map(res => `
+          <div class="result-card">
+            <div class="tag ${res.status}">${res.status}</div>
+            <div class="content">${res.draft_content || '—'}</div>
+            <div class="meta">
+              ${res.twitter_id ? `Tweet ID: ${res.twitter_id} · ` : ''}
+              ${res.error ? `Error: ${res.error} · ` : ''}
+              ${new Date(res.posted_at).toLocaleString()}
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        list.innerHTML = `<div style="color:#cf6f6f;font-size:12px;">Error: ${e.message}</div>`;
+      }
+    }
+
+    // Init
+    checkHealth();
+    loadResults();
+  </script>
+</body>
+</html>
