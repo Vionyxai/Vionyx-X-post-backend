@@ -5,5 +5,11 @@
       "path": "/api/cron/process-queue",
       "schedule": "* * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  }
 }
